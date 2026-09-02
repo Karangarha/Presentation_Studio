@@ -1,4 +1,4 @@
-Deno.serve(async (_req: Request) => {
+Deno.serve(async () => {
   const cloudinaryUrl = Deno.env.get('CLOUDINARY_URL')
   if (!cloudinaryUrl) {
     return new Response(JSON.stringify({ error: 'CLOUDINARY_URL is not configured' }), {
