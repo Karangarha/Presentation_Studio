@@ -33,10 +33,10 @@ const logos = [
 
 const settings = [{ id: true, autoplay_interval_ms: 5000 }]
 
-async function upsert(table, rows, onConflict) {
+async function upsert(table, rows, onConflict, resolution = 'merge-duplicates') {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
     method: 'POST',
-    headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
+    headers: { ...headers, Prefer: `resolution=${resolution},return=minimal` },
     body: JSON.stringify(rows),
   })
   if (!res.ok) {
@@ -45,7 +45,7 @@ async function upsert(table, rows, onConflict) {
 }
 
 await upsert('slides', slides, 'position')
-await upsert('logos', logos, 'slot')
-await upsert('settings', settings, 'id')
+await upsert('logos', logos, 'slot', 'ignore-duplicates')
+await upsert('settings', settings, 'id', 'ignore-duplicates')
 
 console.log('Seeded slides, logos, and settings.')

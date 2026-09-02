@@ -14,7 +14,11 @@ function App() {
   const [index, setIndex] = useState(0)
 
   useEffect(() => {
-    Promise.all([fetchSlides(), fetchLogos(), fetchSettings()])
+    Promise.all([
+      fetchSlides(),
+      fetchLogos().catch(() => ({ left: null, right: null })),
+      fetchSettings().catch(() => ({ autoplayIntervalMs: 5000 })),
+    ])
       .then(([loadedSlides, loadedLogos, settings]) => {
         setSlides(loadedSlides)
         setLogos(loadedLogos)
@@ -47,6 +51,14 @@ function App() {
     return (
       <div className="flex min-h-svh w-full items-center justify-center bg-bg text-text">
         Loading…
+      </div>
+    )
+  }
+
+  if (slides.length === 0) {
+    return (
+      <div className="flex min-h-svh w-full items-center justify-center bg-bg text-text">
+        No slides found — run `npm run seed`.
       </div>
     )
   }

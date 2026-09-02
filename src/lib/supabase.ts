@@ -56,8 +56,10 @@ export async function fetchSettings(): Promise<Settings> {
 export async function updateLogoUrl(slot: 'left' | 'right', url: string): Promise<void> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/logos?slot=eq.${slot}`, {
     method: 'PATCH',
-    headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify({ url }),
   })
   if (!res.ok) throw new Error(`Failed to update ${slot} logo: ${res.status}`)
+  const rows: LogoRow[] = await res.json()
+  if (rows.length === 0) throw new Error(`No logo row found for slot: ${slot}`)
 }
