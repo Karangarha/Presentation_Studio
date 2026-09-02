@@ -1,121 +1,62 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect, useState } from 'react'
+import { fetchLogos, fetchSettings, fetchSlides, type Slide } from './lib/supabase'
+import LogoSlot from './components/LogoSlot'
+import SlideCarousel from './components/SlideCarousel'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [slides, setSlides] = useState<Slide[] | null>(null)
+  const [logos, setLogos] = useState<{ left: string | null; right: string | null }>({
+    left: null,
+    right: null,
+  })
+  const [autoplayIntervalMs, setAutoplayIntervalMs] = useState(5000)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [index, setIndex] = useState(0)
+
+  useEffect(() => {
+    Promise.all([fetchSlides(), fetchLogos(), fetchSettings()])
+      .then(([loadedSlides, loadedLogos, settings]) => {
+        setSlides(loadedSlides)
+        setLogos(loadedLogos)
+        setAutoplayIntervalMs(settings.autoplayIntervalMs)
+      })
+      .catch((err: Error) => setLoadError(err.message))
+  }, [])
+
+  useEffect(() => {
+    if (!slides || slides.length === 0) return
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % slides.length)
+    }, autoplayIntervalMs)
+    return () => clearInterval(id)
+  }, [slides, autoplayIntervalMs])
+
+  function handleLogoUploaded(slot: 'left' | 'right', url: string) {
+    setLogos((prev) => ({ ...prev, [slot]: url }))
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-svh w-full items-center justify-center bg-bg p-6 text-center text-text">
+        Couldn't load the presentation: {loadError}
+      </div>
+    )
+  }
+
+  if (!slides) {
+    return (
+      <div className="flex min-h-svh w-full items-center justify-center bg-bg text-text">
+        Loading…
+      </div>
+    )
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <div className="relative flex min-h-svh w-full flex-col bg-bg text-text font-sans">
+      <LogoSlot slot="left" url={logos.left} onUploaded={handleLogoUploaded} />
+      <LogoSlot slot="right" url={logos.right} onUploaded={handleLogoUploaded} />
+      <SlideCarousel slides={slides} index={index} />
+    </div>
   )
 }
 
