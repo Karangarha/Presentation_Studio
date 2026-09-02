@@ -25,6 +25,7 @@ function LogoSlot({ slot, url, onUploaded }: LogoSlotProps) {
     } catch (err) {
       console.error('Logo upload failed:', err)
       setError('Upload failed')
+      setTimeout(() => setError(null), 4000)
     } finally {
       setIsUploading(false)
       e.target.value = ''
