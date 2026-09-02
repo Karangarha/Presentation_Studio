@@ -20,6 +20,8 @@ function LogoSlot({ slot, url, onUploaded }: LogoSlotProps) {
       const secureUrl = await uploadLogo(file)
       await updateLogoUrl(slot, secureUrl)
       onUploaded(slot, secureUrl)
+    } catch (err) {
+      console.error('Logo upload failed:', err)
     } finally {
       setIsUploading(false)
       e.target.value = ''
