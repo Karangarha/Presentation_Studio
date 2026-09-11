@@ -18,17 +18,20 @@ Deno.serve(async (req) => {
   }
   const [, apiKey, apiSecret, cloudName] = match
 
-  const slot = new URL(req.url).searchParams.get('slot')
-  if (slot !== 'left' && slot !== 'right') {
-    return new Response(JSON.stringify({ error: 'slot must be "left" or "right"' }), {
+  const query = new URL(req.url).searchParams
+  const slot = query.get('slot')
+  const assetType = query.get('asset') ?? 'logo'
+  const publicId = query.get('publicId') ?? slot
+  if (!publicId || (assetType === 'logo' && slot !== 'left' && slot !== 'right')) {
+    return new Response(JSON.stringify({ error: 'A valid asset and publicId are required' }), {
       status: 400,
       headers: corsHeaders,
     })
   }
 
   const timestamp = Math.floor(Date.now() / 1000)
-  const folder = 'abet-logos'
-  const paramsToSign = `folder=${folder}&overwrite=true&public_id=${slot}&timestamp=${timestamp}`
+  const folder = assetType === 'logo' ? 'abet-logos' : 'abet-assets'
+  const paramsToSign = `folder=${folder}&overwrite=true&public_id=${publicId}&timestamp=${timestamp}`
 
   const encoder = new TextEncoder()
   const digest = await crypto.subtle.digest('SHA-1', encoder.encode(paramsToSign + apiSecret))
@@ -43,7 +46,7 @@ Deno.serve(async (req) => {
       apiKey,
       cloudName,
       folder,
-      publicId: slot,
+      publicId,
       overwrite: true,
     }),
     { headers: corsHeaders },

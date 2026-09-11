@@ -11,6 +11,8 @@
     "seed": "node scripts/seed.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "mammoth": "^1.12.2",
     "motion": "^13.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

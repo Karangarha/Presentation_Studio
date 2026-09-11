@@ -6,6 +6,7 @@ create table if not exists public.slides (
   heading text not null,
   subheading text,
   bullets jsonb,
+  image_url text,
   created_at timestamptz not null default now()
 );
 
@@ -14,6 +15,25 @@ alter table public.slides enable row level security;
 drop policy if exists "Public read access" on public.slides;
 create policy "Public read access" on public.slides
   for select
+  to anon
+  using (true);
+
+drop policy if exists "Public insert access" on public.slides;
+create policy "Public insert access" on public.slides
+  for insert
+  to anon
+  with check (true);
+
+drop policy if exists "Public update access" on public.slides;
+create policy "Public update access" on public.slides
+  for update
+  to anon
+  using (true)
+  with check (true);
+
+drop policy if exists "Public delete access" on public.slides;
+create policy "Public delete access" on public.slides
+  for delete
   to anon
   using (true);
 
@@ -52,8 +72,83 @@ create policy "Public read access" on public.settings
   to anon
   using (true);
 
-grant select on public.slides to anon;
+drop policy if exists "Public insert access" on public.settings;
+create policy "Public insert access" on public.settings
+  for insert
+  to anon
+  with check (true);
+
+drop policy if exists "Public update access" on public.settings;
+create policy "Public update access" on public.settings
+  for update
+  to anon
+  using (true)
+  with check (true);
+
+create table if not exists public.backgrounds (
+  id boolean primary key default true,
+  url text,
+  updated_at timestamptz not null default now(),
+  constraint backgrounds_singleton check (id)
+);
+
+alter table public.backgrounds enable row level security;
+
+drop policy if exists "Public read access" on public.backgrounds;
+create policy "Public read access" on public.backgrounds
+  for select
+  to anon
+  using (true);
+
+drop policy if exists "Public insert access" on public.backgrounds;
+create policy "Public insert access" on public.backgrounds
+  for insert
+  to anon
+  with check (true);
+
+drop policy if exists "Public update access" on public.backgrounds;
+create policy "Public update access" on public.backgrounds
+  for update
+  to anon
+  using (true)
+  with check (true);
+
+grant select, insert, update, delete on public.slides to anon;
 grant select, update on public.logos to anon;
-grant select on public.settings to anon;
-grant all on public.slides, public.logos, public.settings to service_role;
+grant select, insert, update on public.settings to anon;
+grant select, insert, update on public.backgrounds to anon;
+grant all on public.slides, public.logos, public.settings, public.backgrounds to service_role;
 grant usage, select on all sequences in schema public to service_role;
+
+alter table public.slides replica identity full;
+alter table public.logos replica identity full;
+alter table public.settings replica identity full;
+alter table public.backgrounds replica identity full;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.slides;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.logos;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.settings;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.backgrounds;
+exception
+  when duplicate_object then null;
+end $$;

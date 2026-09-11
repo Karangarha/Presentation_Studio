@@ -8,7 +8,7 @@
   --color-accent: #aa3bff;
   --color-accent-bg: rgb(170 59 255 / 0.1);
   --color-accent-border: rgb(170 59 255 / 0.5);
-  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Segoe UI", Roboto, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -30,4 +30,20 @@
 body {
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+.tv-logo {
+  width: clamp(9rem, 14vw, 15rem);
+  height: clamp(4.5rem, 8vw, 7.5rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
