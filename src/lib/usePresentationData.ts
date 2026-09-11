@@ -15,7 +15,7 @@ const defaultSettings: Settings = {
   logoScale: 1,
   titleText: 'Department of Computer Science and Technology',
   titleColor: '#ffffff',
-  titleSizePx: 42,
+  titleSizePx: 64,
   titleBold: true,
 }
 

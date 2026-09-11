@@ -313,7 +313,7 @@ export async function fetchSettings(presentationId?: string): Promise<Settings> 
     logoScale: data?.logo_scale ?? 1,
     titleText: data?.title_text ?? 'Department of Computer Science and Technology',
     titleColor: data?.title_color ?? '#ffffff',
-    titleSizePx: data?.title_size_px ?? 42,
+    titleSizePx: data?.title_size_px ?? 64,
     titleBold: data?.title_bold ?? true,
   }
 }

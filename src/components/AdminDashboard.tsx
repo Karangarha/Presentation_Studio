@@ -27,7 +27,7 @@ function UploadField({ label, url, round, onFile }: { label: string; url: string
 function AdminDashboard({ presentationId }: Props) {
   const [slides, setSlides] = useState<Slide[]>([])
   const [logos, setLogos] = useState<Logos>({ left: null, right: null })
-  const [settings, setSettings] = useState<Settings>({ autoplayIntervalMs: 5000, logoScale: 1, titleText: 'Department of Computer Science and Technology', titleColor: '#ffffff', titleSizePx: 42, titleBold: true })
+  const [settings, setSettings] = useState<Settings>({ autoplayIntervalMs: 5000, logoScale: 1, titleText: 'Department of Computer Science and Technology', titleColor: '#ffffff', titleSizePx: 64, titleBold: true })
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null)
   const [presentation, setPresentation] = useState<Presentation | null>(null)
   const [title, setTitle] = useState('')
