@@ -34,6 +34,7 @@ export type Presentation = {
   slug: string
   isPublic: boolean
   updatedAt: string
+  slideCount: number
 }
 export type SlideInput = Omit<Slide, 'id' | 'position'> & { position?: number }
 
@@ -102,7 +103,7 @@ export async function createProfile(userId: string, username: string, displayNam
 export async function fetchPresentations(ownerId: string): Promise<Presentation[]> {
   const { data, error } = await supabase
     .from('presentations')
-    .select('id,owner_id,title,slug,is_public,updated_at')
+    .select('id,owner_id,title,slug,is_public,updated_at,slides(id,position)')
     .eq('owner_id', ownerId)
     .order('updated_at', { ascending: false })
   if (error) throw new Error(`Failed to load presentations: ${error.message}`)
@@ -113,13 +114,14 @@ export async function fetchPresentations(ownerId: string): Promise<Presentation[
     slug: row.slug,
     isPublic: row.is_public,
     updatedAt: row.updated_at,
+    slideCount: row.slides?.length ?? 0,
   }))
 }
 
 export async function fetchPresentation(id: string): Promise<Presentation | null> {
   const { data, error } = await supabase
     .from('presentations')
-    .select('id,owner_id,title,slug,is_public,updated_at')
+    .select('id,owner_id,title,slug,is_public,updated_at,slides(id,position)')
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error(`Failed to load presentation: ${error.message}`)
@@ -131,6 +133,7 @@ export async function fetchPresentation(id: string): Promise<Presentation | null
         slug: data.slug,
         isPublic: data.is_public,
         updatedAt: data.updated_at,
+        slideCount: data.slides?.length ?? 0,
       }
     : null
 }
@@ -159,6 +162,7 @@ export async function createPresentation(ownerId: string, title: string, slug: s
     slug: data.slug,
     isPublic: data.is_public,
     updatedAt: data.updated_at,
+    slideCount: 0,
   }
 }
 
@@ -191,7 +195,7 @@ export async function fetchPublicPresentation(username: string, slug: string): P
   if (error) throw new Error(`Failed to load public presentation: ${error.message}`)
   const row = data?.[0]
   return row
-    ? { id: row.id, ownerId: '', title: row.title, slug: row.slug, isPublic: true, updatedAt: '' }
+    ? { id: row.id, ownerId: '', title: row.title, slug: row.slug, isPublic: true, updatedAt: '', slideCount: 0 }
     : null
 }
 
@@ -339,14 +343,23 @@ export async function updateBackground(url: string, presentationId?: string): Pr
   if (error) throw new Error(`Failed to update background: ${error.message}`)
 }
 
-export function subscribeToPresentationChanges(onChange: () => void): () => void {
-  const channel: RealtimeChannel = supabase
-    .channel('presentation-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'slides' }, onChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'logos' }, onChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, onChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'backgrounds' }, onChange)
-    .subscribe()
+export function subscribeToPresentationChanges(onChange: () => void, presentationId?: string): () => void {
+  const channel: RealtimeChannel = supabase.channel(`presentation-changes-${presentationId ?? 'legacy'}`)
+  if (presentationId) {
+    const filter = { filter: `presentation_id=eq.${presentationId}` }
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slides', ...filter }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'presentation_logos', ...filter }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'presentation_settings', ...filter }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'presentation_backgrounds', ...filter }, onChange)
+  } else {
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slides' }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'logos' }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'backgrounds' }, onChange)
+  }
+  channel.subscribe()
 
   return () => {
     void supabase.removeChannel(channel)

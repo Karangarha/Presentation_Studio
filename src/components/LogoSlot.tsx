@@ -8,9 +8,11 @@ type LogoSlotProps = {
   onUploaded: (slot: 'left' | 'right', url: string) => void
   readOnly?: boolean
   scale?: number
+  embedded?: boolean
+  contained?: boolean
 }
 
-function LogoSlot({ slot, url, onUploaded, readOnly = false, scale = 1 }: LogoSlotProps) {
+function LogoSlot({ slot, url, onUploaded, readOnly = false, scale = 1, embedded = false, contained = false }: LogoSlotProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +37,9 @@ function LogoSlot({ slot, url, onUploaded, readOnly = false, scale = 1 }: LogoSl
   }
 
   const position = slot === 'left' ? 'left-6' : 'right-6'
-  const logoStyle = { width: `${256 * scale}px`, height: `${128 * scale}px` }
+  const logoStyle = embedded
+    ? { width: `${Math.min(256 * scale, 18)}cqw`, height: `${Math.min(128 * scale, 9)}cqw` }
+    : { width: `${256 * scale}px`, height: `${128 * scale}px` }
   const content = url ? (
     <img
       src={url}
@@ -51,7 +55,7 @@ function LogoSlot({ slot, url, onUploaded, readOnly = false, scale = 1 }: LogoSl
   if (readOnly) {
     return (
       <div
-        className={`tv-logo pointer-events-none fixed top-4 ${position} z-20 flex items-center justify-center overflow-hidden p-2`}
+        className={`tv-logo pointer-events-none ${contained ? 'absolute' : 'fixed'} top-4 ${position} z-20 flex items-center justify-center overflow-hidden p-2`}
         style={logoStyle}
         aria-label={`${slot} logo`}
       >
