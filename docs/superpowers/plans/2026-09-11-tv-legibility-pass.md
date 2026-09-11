@@ -161,6 +161,8 @@ git commit -m "feat: raise default screen-title size for TV legibility"
 
 This step is NOT for an agent to run automatically — it touches a Supabase project that may be shared/linked. Tell the user the migration file is ready and ask them to run their normal migration deploy step (e.g. `supabase db push`) themselves, or confirm explicitly before you run it.
 
+Until this migration is applied, the JS `?? 64` fallbacks and the live database disagree: those fallbacks only kick in when a settings row is entirely missing, which in practice never happens for a real presentation (`createPresentation` always inserts a `presentation_settings` row immediately). So every presentation created before this migration runs — including any created today, right now — gets a real row containing `42`, and no fallback rescues it. The three JS files agreeing on `64` only guarantees the *code's* default is right; it says nothing about what any given presentation's screen title actually renders at until the migration ships.
+
 ---
 
 ### Task 2: Increase the active-card text sizes in TV mode
@@ -281,11 +283,13 @@ Run: `npm run dev`
 
 Open the printed local URL at the path `/{your-username}/{your-presentation-slug}` in a browser.
 
-- [ ] **Step 2: Check for text overflow on long names**
+- [ ] **Step 2: Check for text overflow — expect this to reproduce on an ordinary name, not just a long one**
 
-The card has a fixed height (`h-[clamp(22rem,70vh,38.75rem)]`) and `overflow-hidden` — content that doesn't fit gets silently clipped rather than shown. With the name now roughly twice its old size, a long two-line name could push the card's total content height past its budget. Open (or create) a slide with a long name (e.g. "Alexandria Montgomery-Whitfield") and confirm the name, degree/year, position, and company are all still fully visible — nothing clipped at the bottom of the card.
+Correction from the final review (the original wording of this step undersold the risk): running the actual numbers at 1920×1080, the card's content budget is ≈556px, and a plain two-word name like "Sarah Chen" or "Priya Sharma" already wraps to two lines at the new 72px cap (≈8 characters fit per line in the card's 288px content width) — pushing total content to ≈557px, already over budget. At 720p it's worse: ≈461px available, ~6 characters per line, so even a single two-word name is likely to clip. **This is expected to reproduce on the first ordinary name you try, not something you need a stress-test name to find.**
 
-If it clips: this plan intentionally did not touch card height or add `truncate`/line-clamp to the name, since that's a layout decision, not a text-size decision. Flag it back rather than silently patching it in — the right fix (bigger card vs. truncated name vs. smaller cap) is a product call.
+The card has a fixed height (`h-[clamp(22rem,70vh,38.75rem)]`) and `overflow-hidden` — content that doesn't fit gets silently clipped from the bottom (most likely the company line) rather than shown. Open the public page with a real two-word name already in it and confirm degree/year, name, position, and company are all fully visible. Separately, also test one long **unbroken single-token** surname (e.g. "Venkataraman") — the name `<h2>` has `max-w-full` but no `break-words`/`overflow-wrap`, so at 72px a token that doesn't fit the 288px width can clip mid-word horizontally, independent of the vertical overflow above.
+
+If either clips: this plan intentionally did not touch card height, add `truncate`/line-clamp, or add word-breaking, since those are layout decisions, not text-size decisions. Flag it back rather than silently patching it in — the right fix (bigger card vs. truncated name vs. smaller name cap vs. `break-words`) is a product call. The candidate code locations if you do decide to fix it: card height cap at `src/components/SlideCarousel.tsx:99` (`38.75rem`), name size ceiling at `:123` (`4.5rem`), name wrapping at `:121-125` (the `<h2>`, currently no `break-words`).
 
 - [ ] **Step 3: View from the actual intended distance**
 
