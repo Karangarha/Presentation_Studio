@@ -44,11 +44,11 @@ function AuthPage({ onAuthenticated }: AuthPageProps) {
         {error && <p className="rounded-lg border border-red-400/50 bg-red-400/10 p-3 text-sm text-red-600">{error}</p>}
         <label className="block text-sm">
           Email
-          <input className="mt-1 w-full rounded-lg border border-border bg-transparent p-3" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+          <input className="mt-1 w-full rounded-lg border border-border bg-transparent p-3" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
         </label>
         <label className="block text-sm">
           Password
-          <input className="mt-1 w-full rounded-lg border border-border bg-transparent p-3" type="password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} />
+          <input className="mt-1 w-full rounded-lg border border-border bg-transparent p-3" type="password" autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'} minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} />
         </label>
         <button className="w-full rounded-lg bg-accent px-4 py-3 font-medium text-white disabled:opacity-50" type="submit" disabled={busy}>
           {busy ? 'Working…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
