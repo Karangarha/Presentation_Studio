@@ -1,584 +1,337 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ArrowLeft, Pause, Pencil, Play, Plus, Sparkles, SkipBack, SkipForward, Trash2, Upload, X } from 'lucide-react'
 import { uploadAsset, uploadLogo } from '../lib/cloudinary'
-import { importDocx } from '../lib/docx'
-import SlideCarousel from './SlideCarousel'
+import PresentationFrame from './PresentationFrame'
 import {
-  createSlide,
-  deleteSlide,
-  fetchBackground,
-  fetchLogos,
-  fetchPresentation,
-  fetchSettings,
-  fetchSlides,
-  reorderSlides,
-  subscribeToPresentationChanges,
-  updateBackground,
-  updateLogoUrl,
-  updatePresentation,
-  updateSettings,
-  updateSlide,
-  type Logos,
-  type Settings,
-  type Slide,
-  type SlideInput,
-  type Presentation,
+  createSlide, deleteSlide, fetchBackground, fetchLogos, fetchPresentation, fetchProfile, fetchSettings,
+  fetchSlides, reorderSlides, subscribeToPresentationChanges, updateBackground, updateLogoUrl,
+  updatePresentation, updateSettings, updateSlide, type Logos, type Presentation, type Settings,
+  type Slide, type SlideInput,
 } from '../lib/supabase'
 
-const blankSlide: SlideInput = {
-  type: 'content',
-  eyebrow: '',
-  heading: '',
-  subheading: '',
-  bullets: [],
-  imageUrl: null,
-  degreeYear: '',
-  name: '',
-  jobTitle: '',
-  company: '',
-  companyLogoUrl: null,
+const blankSlide: SlideInput = { type: 'content', eyebrow: '', heading: '', subheading: '', bullets: [], imageUrl: null, degreeYear: '', name: '', jobTitle: '', company: '', companyLogoUrl: null }
+type Props = { presentationId?: string }
+
+function UploadField({ label, url, round, onFile }: { label: string; url: string | null; round?: boolean; onFile: (file?: File) => void }) {
+  return (
+    <label className="upload-field">
+      <span>{label}</span>
+      <div className="upload-field-row">
+        {url ? <img src={url} alt="" className={`upload-thumb ${round ? 'round' : ''}`} /> : <span className={`upload-thumb empty ${round ? 'round' : ''}`} />}
+        <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0])} />
+      </div>
+    </label>
+  )
 }
 
-type AdminDashboardProps = { presentationId?: string }
-
-function AdminDashboard({ presentationId }: AdminDashboardProps) {
+function AdminDashboard({ presentationId }: Props) {
   const [slides, setSlides] = useState<Slide[]>([])
   const [logos, setLogos] = useState<Logos>({ left: null, right: null })
-  const [settings, setSettings] = useState<Settings>({
-    autoplayIntervalMs: 5000,
-    logoScale: 1,
-    titleText: 'Department of Computer Science and Technology',
-    titleColor: '#ffffff',
-    titleSizePx: 42,
-    titleBold: true,
-  })
+  const [settings, setSettings] = useState<Settings>({ autoplayIntervalMs: 5000, logoScale: 1, titleText: 'Department of Computer Science and Technology', titleColor: '#ffffff', titleSizePx: 64, titleBold: true })
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null)
   const [presentation, setPresentation] = useState<Presentation | null>(null)
-  const [presentationTitle, setPresentationTitle] = useState('')
-  const [presentationSlug, setPresentationSlug] = useState('')
+  const [title, setTitle] = useState('')
+  const [slug, setSlug] = useState('')
+  const [username, setUsername] = useState('')
   const [draft, setDraft] = useState<SlideInput>(blankSlide)
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [docxFile, setDocxFile] = useState<File | null>(null)
-  const [importPreview, setImportPreview] = useState<SlideInput[] | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [tab, setTab] = useState<'slide' | 'global'>('slide')
+  const [playing, setPlaying] = useState(true)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerWidth, setDrawerWidth] = useState(360)
+  const [resizingDrawer, setResizingDrawer] = useState(false)
+  const [dragging, setDragging] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
-  const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
-  const [previewIndex, setPreviewIndex] = useState(0)
-  const [previewPlaying, setPreviewPlaying] = useState(true)
-  const loadRequest = useRef(0)
+  const [status, setStatus] = useState('All changes saved')
+  const [error, setError] = useState<string | null>(null)
+  const [importPreview, setImportPreview] = useState<SlideInput[] | null>(null)
+  const [importing, setImporting] = useState(false)
+  const titleTimer = useRef<number | null>(null)
+  const slideTimer = useRef<number | null>(null)
+  const loadId = useRef(0)
+  const drawerRef = useRef<HTMLElement | null>(null)
+  const editorRef = useRef<HTMLDivElement | null>(null)
+  const docxInputRef = useRef<HTMLInputElement | null>(null)
 
   const load = useCallback(async () => {
-    const requestId = ++loadRequest.current
-    const [loadedSlides, loadedLogos, loadedSettings, loadedBackground, loadedPresentation] = await Promise.all([
-      fetchSlides(presentationId),
-      fetchLogos(presentationId),
-      fetchSettings(presentationId),
-      fetchBackground(presentationId),
-      presentationId ? fetchPresentation(presentationId) : Promise.resolve(null),
-    ])
-    if (requestId !== loadRequest.current) return
-    setSlides(loadedSlides)
-    setLogos(loadedLogos)
-    setSettings(loadedSettings)
-    setBackgroundUrl(loadedBackground.url)
-    setPresentation(loadedPresentation)
-    setPresentationTitle(loadedPresentation?.title ?? '')
-    setPresentationSlug(loadedPresentation?.slug ?? '')
+    const id = ++loadId.current
+    const [s, l, st, bg, p] = await Promise.all([fetchSlides(presentationId), fetchLogos(presentationId), fetchSettings(presentationId), fetchBackground(presentationId), presentationId ? fetchPresentation(presentationId) : Promise.resolve(null)])
+    if (id !== loadId.current) return
+    setSlides(s); setLogos(l); setSettings(st); setBackgroundUrl(bg.url); setPresentation(p); setTitle(p?.title ?? ''); setSlug(p?.slug ?? '')
+    if (p) setUsername((await fetchProfile(p.ownerId))?.username ?? '')
+    setActiveIndex((current) => Math.min(current, Math.max(0, s.length - 1)))
   }, [presentationId])
 
-  async function savePresentationDetails() {
-    if (!presentationId || !presentationTitle.trim() || !presentationSlug.trim()) return
-    setBusy(true)
-    setError(null)
-    try {
-      await updatePresentation(presentationId, {
-        title: presentationTitle.trim(),
-        slug: presentationSlug.trim().toLowerCase(),
-      })
-      setPresentation((current) => current ? { ...current, title: presentationTitle.trim(), slug: presentationSlug.trim().toLowerCase() } : current)
-      setMessage('Presentation details saved.')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
+  // Loading persisted editor state is the external synchronization this effect owns.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load().catch((e: Error) => setError(e.message)); const unsubscribe = subscribeToPresentationChanges(() => void load(), presentationId); return unsubscribe }, [load, presentationId])
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void load().catch((err: Error) => setError(err.message))
-    }, 0)
-    const unsubscribe = subscribeToPresentationChanges(() =>
-      void load().catch((err: Error) => setError(err.message)),
-    )
-    return () => {
-      window.clearTimeout(timer)
-      unsubscribe()
-    }
-  }, [load])
-
-  useEffect(() => {
-    if (!previewPlaying || slides.length < 2) return
-    const timer = window.setInterval(() => {
-      setPreviewIndex((current) => (current + 1) % slides.length)
-    }, settings.autoplayIntervalMs)
+    if (!playing || slides.length < 2) return
+    const timer = window.setInterval(() => setActiveIndex((i) => (i + 1) % slides.length), settings.autoplayIntervalMs)
     return () => window.clearInterval(timer)
-  }, [previewPlaying, slides.length, settings.autoplayIntervalMs])
+  }, [playing, slides.length, settings.autoplayIntervalMs])
 
-  function startEdit(slide: Slide) {
-    setEditingId(slide.id)
-    setDraft({ ...slide })
-    setError(null)
+  const flushPendingSave = useCallback(() => {
+    if (!slideTimer.current) return
+    window.clearTimeout(slideTimer.current)
+    slideTimer.current = null
+    if (editingId === null || (!draft.name.trim() && !draft.heading.trim())) return
+    void updateSlide(editingId, { ...draft, bullets: draft.bullets.filter((line) => line.trim() !== '') }).then(() => setStatus('All changes saved')).catch((e: Error) => setError(e.message))
+  }, [editingId, draft])
+
+  const toggleEditSlide = (slide: Slide, index: number) => {
+    flushPendingSave()
+    if (editingId === slide.id) { setEditingId(null); return }
+    setActiveIndex(index); setEditingId(slide.id); setDraft({ ...slide }); setTab('slide'); setDrawerOpen(true); setError(null)
   }
-
-  function resetEditor() {
-    setEditingId(null)
-    setDraft(blankSlide)
+  const previewSlide = (slide: Slide, index: number) => {
+    setActiveIndex(index)
+    if (editingId !== null && editingId !== slide.id) { flushPendingSave(); setEditingId(null) }
   }
-
-  async function saveSlide() {
-    if (!draft.heading.trim()) {
-      setError('A slide heading is required.')
-      return
-    }
-    setBusy(true)
-    setError(null)
+  const newSlide = useCallback(async () => {
+    flushPendingSave()
+    setBusy(true); setError(null)
     try {
-      if (editingId === null) {
-        await createSlide({ ...draft, position: slides.length + 1 }, presentationId)
-        setMessage('Slide created.')
-      } else {
-        await updateSlide(editingId, draft)
-        setMessage('Slide updated.')
-      }
-      resetEditor()
-      await load()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
+      const created = await createSlide({ ...blankSlide, position: slides.length + 1 }, presentationId)
+      setSlides((current) => [...current, created])
+      setActiveIndex(slides.length)
+      setEditingId(created.id)
+      setDraft({ ...created })
+      setTab('slide'); setDrawerOpen(true)
+    } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+  }, [flushPendingSave, slides.length, presentationId])
+  const editDraft = (patch: Partial<SlideInput>) => { setDraft((current) => ({ ...current, ...patch })); setStatus('Unsaved changes') }
+
+  useEffect(() => {
+    if (editingId === null || (!draft.name.trim() && !draft.heading.trim())) return
+    if (slideTimer.current) window.clearTimeout(slideTimer.current)
+    slideTimer.current = window.setTimeout(() => {
+      slideTimer.current = null
+      void updateSlide(editingId, { ...draft, bullets: draft.bullets.filter((line) => line.trim() !== '') }).then(() => setStatus('All changes saved')).catch((e: Error) => setError(e.message))
+    }, 700)
+    return () => { if (slideTimer.current) window.clearTimeout(slideTimer.current) }
+  }, [draft, editingId])
+
+  useEffect(() => {
+    if (!presentationId || !presentation || title === presentation.title || !title.trim()) return
+    if (titleTimer.current) window.clearTimeout(titleTimer.current)
+    titleTimer.current = window.setTimeout(() => {
+      void updatePresentation(presentationId, { title: title.trim() }).then(() => { setPresentation((p) => p ? { ...p, title: title.trim() } : p); setStatus('All changes saved') }).catch((e: Error) => setError(e.message))
+    }, 700)
+    return () => { if (titleTimer.current) window.clearTimeout(titleTimer.current) }
+  }, [title, presentation, presentationId])
+
+  useEffect(() => {
+    if (!resizingDrawer) return
+    const move = (event: PointerEvent) => setDrawerWidth(Math.min(520, Math.max(280, event.clientX)))
+    const stop = () => setResizingDrawer(false)
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop, { once: true })
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', stop)
     }
-  }
+  }, [resizingDrawer])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        void newSlide()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [newSlide])
+
+  useEffect(() => {
+    if (tab === 'slide' && drawerOpen) editorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [editingId, tab, drawerOpen])
 
   async function removeSlide(id: number) {
     if (!window.confirm('Delete this slide?')) return
     setBusy(true)
     try {
       await deleteSlide(id)
+      if (id === editingId) {
+        if (slideTimer.current) { window.clearTimeout(slideTimer.current); slideTimer.current = null }
+        setEditingId(null)
+      }
       await load()
-      setMessage('Slide deleted.')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+    } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-
-  async function moveSlide(index: number, direction: -1 | 1) {
-    const target = index + direction
-    if (target < 0 || target >= slides.length) return
-    const next = [...slides]
-    ;[next[index], next[target]] = [next[target], next[index]]
-    setSlides(next)
+  async function moveSlides(from: number, to: number) {
+    if (to < 0 || to >= slides.length) return
+    const next = [...slides]; const [item] = next.splice(from, 1); next.splice(to, 0, item); setSlides(next); setActiveIndex(to)
+    try { await reorderSlides(next) } catch (e) { setError((e as Error).message); void load() }
+  }
+  async function saveGlobal() {
+    setBusy(true); try { await updateSettings(settings, presentationId); setStatus('All changes saved') } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+  }
+  async function publish() {
+    if (!presentationId) return
     setBusy(true)
     try {
-      await reorderSlides(next)
-      setMessage('Display order updated.')
-    } catch (err) {
-      setError((err as Error).message)
-      await load()
-    } finally {
-      setBusy(false)
-    }
-
-  }
-
-  async function dropSlide(targetIndex: number) {
-    if (draggingIndex === null || draggingIndex === targetIndex) return
-    const next = [...slides]
-    const [dragged] = next.splice(draggingIndex, 1)
-    next.splice(targetIndex, 0, dragged)
-    setDraggingIndex(null)
-    setSlides(next)
-    setBusy(true)
-    try {
-      await reorderSlides(next)
-      setMessage('Display order updated.')
-    } catch (err) {
-      setError((err as Error).message)
-      await load()
+      await updatePresentation(presentationId, { isPublic: true })
+      setPresentation((current) => current ? { ...current, isPublic: true } : current)
+      setStatus('Published to TV')
+    } catch (e) {
+      setError((e as Error).message)
     } finally {
       setBusy(false)
     }
   }
-
-  async function saveSettings() {
-    setBusy(true)
-    const savedSettings = settings
-    try {
-      await updateSettings(savedSettings, presentationId)
-      setSettings(savedSettings)
-      await load()
-      setMessage('Presentation settings saved.')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+  async function upload(slot: 'left' | 'right', file?: File) {
+    if (!file) return; setBusy(true); try { const url = await uploadLogo(file, slot); await updateLogoUrl(slot, url, presentationId); setLogos((l) => ({ ...l, [slot]: url })) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-
-  async function handleLogo(file: File, slot: 'left' | 'right') {
-    setBusy(true)
-    try {
-      const url = await uploadLogo(file, slot)
-      await updateLogoUrl(slot, url, presentationId)
-      setLogos((current) => ({ ...current, [slot]: url }))
-      setMessage(`${slot} logo updated.`)
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+  async function uploadBg(file?: File) {
+    if (!file) return; setBusy(true); try { const url = await uploadAsset(file, `background-${crypto.randomUUID()}`); await updateBackground(url, presentationId); setBackgroundUrl(url) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-
-  async function handleBackground(file: File) {
-    setBusy(true)
-    try {
-      const url = await uploadAsset(file, `background-${crypto.randomUUID()}`)
-      await updateBackground(url, presentationId)
-      setBackgroundUrl(url)
-      setMessage('Background updated.')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+  async function uploadSlidePhoto(file?: File) {
+    if (!file) return; setBusy(true); try { const url = await uploadAsset(file, `slide-photo-${crypto.randomUUID()}`); editDraft({ imageUrl: url }) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-
-  async function prepareImport() {
-    if (!docxFile) return
-    setBusy(true)
-    setError(null)
-    try {
-      setImportPreview(await importDocx(docxFile))
-      setMessage('Import preview ready. Review it before applying.')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+  async function prepareImport(file?: File) {
+    if (!file) return
+    setBusy(true); setError(null)
+    try { const { importDocx } = await import('../lib/docx'); setImportPreview(await importDocx(file)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
-
   async function applyImport() {
     if (!importPreview) return
-    setBusy(true)
+    setImporting(true); setError(null)
     try {
-      for (const [index, slide] of importPreview.entries()) {
-        await createSlide({ ...slide, position: slides.length + index + 1 }, presentationId)
+      let position = slides.length
+      for (const section of importPreview) {
+        position += 1
+        await createSlide({ ...section, position }, presentationId)
       }
       setImportPreview(null)
-      setDocxFile(null)
       await load()
-      setMessage('DOCX slides imported.')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
-    }
+      setStatus('All changes saved')
+    } catch (e) { setError((e as Error).message) } finally { setImporting(false) }
   }
 
+  const editorFields = (
+    <>
+      <UploadField label="Photo" url={draft.imageUrl} round onFile={uploadSlidePhoto} />
+      <label>Name<input value={draft.name} onChange={(e) => editDraft({ name: e.target.value })} placeholder="Alumni name" /></label>
+      <div className="inspector-grid">
+        <label>Degree &amp; year<input value={draft.degreeYear} onChange={(e) => editDraft({ degreeYear: e.target.value })} placeholder="B.S. 2024" /></label>
+        <label>Position<input value={draft.jobTitle} onChange={(e) => editDraft({ jobTitle: e.target.value })} /></label>
+      </div>
+      <label>Company<input value={draft.company} onChange={(e) => editDraft({ company: e.target.value })} /></label>
+    </>
+  )
   return (
-    <main className="min-h-svh bg-bg p-6 text-text">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm uppercase tracking-wide text-accent">Presentation control</p>
-            <h1 className="text-3xl font-semibold text-text-h">Admin dashboard</h1>
+    <main className="editor-studio">
+      <header className="studio-header">
+        <a href="/" className="back-link" aria-label="Back to presentations"><ArrowLeft size={18} /></a>
+        <div className="studio-title"><span>Presentation</span><input value={title} onChange={(e) => { setTitle(e.target.value); setStatus('Unsaved changes') }} aria-label="Presentation title" /></div>
+        {presentation && <span className={`status-badge ${presentation.isPublic ? 'public' : 'private'}`}>{presentation.isPublic ? 'Public' : 'Private'}</span>}
+        <span className={`save-state ${status === 'Unsaved changes' ? 'pending' : ''}`}><i />{status}</span>
+        <div className="header-actions"><button className="ghost-button" onClick={() => { setTab('slide'); setDrawerOpen(true) }}>Slides</button><button className="ghost-button" onClick={() => { setTab('global'); setDrawerOpen(true) }}>Global settings</button><a href={username && slug ? `/${username}/${slug}` : '/'} target="_blank" rel="noreferrer" className="ghost-button">Preview ↗</a><button className="primary-button" onClick={() => void publish()} disabled={busy}>Publish to TV</button></div>
+      </header>
+      {error && <div className="studio-error">{error}<button onClick={() => setError(null)} aria-label="Dismiss error"><X size={16} /></button></div>}
+      <div className={`studio-body ${drawerOpen ? 'drawer-is-open' : ''}`} style={{ '--drawer-width': `${drawerWidth}px` } as React.CSSProperties}>
+        <aside ref={drawerRef} className={`studio-drawer ${drawerOpen ? 'open' : ''}`} style={{ width: `min(${drawerWidth}px, 92vw)` }}>
+          <button className="drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Close settings drawer"><X size={18} /></button>
+          <div className="drawer-resize-handle" onPointerDown={(event) => { event.preventDefault(); setResizingDrawer(true) }} role="separator" aria-label="Resize settings drawer" aria-orientation="vertical" />
+          <div className="drawer-tabs"><button className={tab === 'slide' ? 'active' : ''} onClick={() => setTab('slide')}>Slides</button><button className={tab === 'global' ? 'active' : ''} onClick={() => setTab('global')}>Global</button></div>
+          {tab === 'slide' && <div className="slide-sidebar">
+          <div className="panel-heading">
+            <div><span className="eyebrow">Storyboard</span><h2>{slides.length} slides</h2></div>
+            <div className="panel-heading-actions">
+              <button className="icon-button" onClick={() => docxInputRef.current?.click()} title="Import DOCX" aria-label="Import DOCX" disabled={busy}><Upload size={16} /></button>
+              <button className="icon-button" onClick={() => void newSlide()} title="New slide" aria-label="New slide"><Plus size={18} /></button>
+            </div>
+            <input ref={docxInputRef} type="file" accept=".docx" className="hidden" onChange={(e) => { void prepareImport(e.target.files?.[0]); e.target.value = '' }} />
           </div>
-          <a className="rounded-lg border border-border px-4 py-2 text-sm hover:border-accent" href="/">
-            Open TV view
-          </a>
-        </header>
-
-        {presentation && (
-          <section className="rounded-2xl border border-border p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-sm uppercase tracking-wide text-accent">Presentation identity</p>
-                <h2 className="mt-1 text-xl font-semibold text-text-h">{presentation.title}</h2>
-                <p className="mt-1 break-all text-sm text-text">Public URL: /{presentation.slug}</p>
-              </div>
-              <span className={`rounded-full px-3 py-1 text-xs ${presentation.isPublic ? 'bg-green-400/15 text-green-600' : 'bg-amber-400/15 text-amber-600'}`}>
-                {presentation.isPublic ? 'Public' : 'Private'}
-              </span>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-              <label className="text-sm">
-                Title
-                <input className="mt-1 w-full rounded-lg border border-border bg-transparent p-2" value={presentationTitle} onChange={(event) => setPresentationTitle(event.target.value)} />
-              </label>
-              <label className="text-sm">
-                URL slug
-                <input className="mt-1 w-full rounded-lg border border-border bg-transparent p-2" pattern="[a-z0-9-]+" value={presentationSlug} onChange={(event) => setPresentationSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} />
-              </label>
-              <button className="self-end rounded-lg bg-accent px-4 py-2 text-sm text-white disabled:opacity-50" onClick={() => void savePresentationDetails()} disabled={busy || !presentationTitle.trim() || !presentationSlug.trim()}>
-                Save details
-              </button>
-            </div>
-          </section>
-        )}
-
-        {(message || error) && (
-          <div className={`rounded-lg border p-3 text-sm ${error ? 'border-red-400 text-red-600' : 'border-green-400 text-green-600'}`}>
-            {error ?? message}
-          </div>
-        )}
-
-        {slides.length > 0 && (
-          <section
-            className="relative h-[460px] overflow-hidden rounded-2xl border border-border bg-bg bg-cover bg-center"
-            style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : undefined}
-          >
-            {backgroundUrl && (
-              <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_center,transparent_10%,rgb(2_6_23_/_0.42)_100%),linear-gradient(rgb(2_6_23_/_0.55),rgb(2_6_23_/_0.68))]" />
-            )}
-            <div className="pointer-events-none absolute left-3 top-3 z-30 flex items-center justify-center overflow-hidden p-1" style={{ width: `${96 * settings.logoScale}px`, height: `${48 * settings.logoScale}px` }}>
-              {logos.left && <img src={logos.left} alt="" className="max-h-full max-w-full object-contain brightness-0 invert" />}
-            </div>
-            <div className="pointer-events-none absolute right-3 top-3 z-30 flex items-center justify-center overflow-hidden p-1" style={{ width: `${96 * settings.logoScale}px`, height: `${48 * settings.logoScale}px` }}>
-              {logos.right && <img src={logos.right} alt="" className="max-h-full max-w-full object-contain brightness-0 invert" />}
-            </div>
-            {settings.titleText ? (
-              <div
-                className={`pointer-events-none absolute inset-x-0 top-3 z-30 mx-auto flex items-center justify-center text-center leading-[0.92] tracking-tight drop-shadow-md ${
-                  settings.titleBold ? 'font-bold' : 'font-normal'
-                }`}
-                style={{
-                  color: settings.titleColor,
-                  fontSize: `${settings.titleSizePx}px`,
-                  height: `${48 * settings.logoScale}px`,
-                }}
-              >
-                {settings.titleText}
-              </div>
-            ) : null}
-            <SlideCarousel slides={slides} index={previewIndex} compact />
-            <button
-              type="button"
-              className="absolute bottom-4 right-4 z-40 rounded-lg bg-black/60 px-4 py-2 text-sm text-white"
-              onClick={() => setPreviewPlaying((playing) => !playing)}
-            >
-              {previewPlaying ? 'Pause preview' : 'Play preview'}
-            </button>
-          </section>
-        )}
-
-        <section className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-          <div className="space-y-4 rounded-2xl border border-border p-5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold text-text-h">Slides</h2>
-              <button className="rounded-lg bg-accent px-3 py-2 text-sm text-white" onClick={resetEditor}>
-                New slide
-              </button>
-            </div>
-            <div className="space-y-2">
-              {slides.map((slide, index) => (
-                <div
-                  key={slide.id}
-                  draggable={!busy}
-                  onDragStart={() => setDraggingIndex(index)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => void dropSlide(index)}
-                  onClick={() => startEdit(slide)}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 transition ${
-                    draggingIndex === index ? 'opacity-50' : 'hover:border-accent'
-                  }`}
-                >
-                  <span className="cursor-grab text-lg text-text" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>
-                  <span className="w-7 text-center text-sm text-text">{index + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-text-h">{slide.name || slide.heading}</p>
-                    <p className="text-xs uppercase text-text">{slide.type}</p>
+          <div className="slide-list">
+            {importPreview && (
+              <div className="drawer-slide-editor inline">
+                <div className="inspector-heading"><div><span className="eyebrow">Import preview</span><h2>{importPreview.length} slide{importPreview.length === 1 ? '' : 's'}</h2></div></div>
+                <div className="inspector-content">
+                  <ul className="import-preview-list">
+                    {importPreview.map((section, index) => (
+                      <li key={index}>{section.name || 'Unnamed'}{section.jobTitle ? ` — ${section.jobTitle}` : ''}{section.company ? ` @ ${section.company}` : ''}</li>
+                    ))}
+                  </ul>
+                  <div className="import-preview-actions">
+                    <button className="primary-button" onClick={() => void applyImport()} disabled={importing}>{importing ? 'Importing…' : `Import ${importPreview.length} slide${importPreview.length === 1 ? '' : 's'}`}</button>
+                    <button className="ghost-button" onClick={() => setImportPreview(null)} disabled={importing}>Cancel</button>
                   </div>
-                  <button
-                    type="button"
-                    className="rounded p-1 text-lg leading-none hover:bg-accent-bg disabled:opacity-30"
-                    onClick={(event) => { event.stopPropagation(); void moveSlide(index, -1) }}
-                    disabled={busy || index === 0}
-                    aria-label="Move slide up"
-                    title="Move up"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded p-1 text-lg leading-none hover:bg-accent-bg disabled:opacity-30"
-                    onClick={(event) => { event.stopPropagation(); void moveSlide(index, 1) }}
-                    disabled={busy || index === slides.length - 1}
-                    aria-label="Move slide down"
-                    title="Move down"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded p-1 text-red-500 hover:bg-red-500/10 disabled:opacity-30"
-                    onClick={(event) => { event.stopPropagation(); void removeSlide(slide.id) }}
-                    disabled={busy}
-                    aria-label={`Delete ${slide.name || slide.heading}`}
-                    title="Delete slide"
-                  >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-2">
-                      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-                    </svg>
-                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+            {slides.map((slide, index) => (
+              <div key={slide.id} className="slide-row">
+                <div draggable={!busy} onDragStart={() => setDragging(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragging !== null) void moveSlides(dragging, index); setDragging(null) }} onClick={() => previewSlide(slide, index)} className={`slide-item ${index === activeIndex ? 'selected' : ''} ${dragging === index ? 'dragging' : ''}`}>
+                  <div className="slide-thumb"><span>{String(index + 1).padStart(2, '0')}</span><strong>{slide.name || slide.heading || 'Untitled slide'}</strong></div>
+                  <div className="slide-actions">
+                    <button className="icon-button" onClick={(e) => { e.stopPropagation(); toggleEditSlide(slide, index) }} title={editingId === slide.id ? 'Save and close' : 'Edit slide'} aria-label={editingId === slide.id ? 'Save and close' : 'Edit slide'}><Pencil size={14} /></button>
+                    <button className="icon-button danger" onClick={(e) => { e.stopPropagation(); void removeSlide(slide.id) }} title="Delete slide" aria-label="Delete slide"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+                {editingId === slide.id && (
+                  <div className="drawer-slide-editor inline" ref={editorRef}>
+                    <div className="inspector-heading"><div><span className="eyebrow">Editing slide</span><h2>Slide {index + 1}</h2></div></div>
+                    <div className="inspector-content">{editorFields}</div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
+          <button className="new-slide-button" onClick={() => void newSlide()}><Plus size={16} /> <span>New slide</span><kbd>⌘ K</kbd></button>
+        </div>}
+          {tab === 'global' && <div className="drawer-global">
+            <div className="inspector-content">
+              <div className="inspector-heading"><div><span className="eyebrow">Presentation system</span><h2>Global settings</h2></div></div>
 
-          <section className="rounded-2xl border border-border p-5">
-            <h2 className="mb-4 text-xl font-semibold text-text-h">{editingId === null ? 'Add slide' : 'Edit slide'}</h2>
-            <div className="space-y-3">
-              <select className="w-full rounded-lg border border-border bg-transparent p-2" value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as SlideInput['type'] })}>
-                <option value="title">Title</option>
-                <option value="content">Content</option>
-              </select>
-              <input className="w-full rounded-lg border border-border bg-transparent p-2" placeholder="Eyebrow" value={draft.eyebrow} onChange={(e) => setDraft({ ...draft, eyebrow: e.target.value })} />
-              <input className="w-full rounded-lg border border-border bg-transparent p-2" placeholder="Degree & year" value={draft.degreeYear} onChange={(e) => setDraft({ ...draft, degreeYear: e.target.value })} />
-              <input className="w-full rounded-lg border border-border bg-transparent p-2" placeholder="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-              <input className="w-full rounded-lg border border-border bg-transparent p-2" placeholder="Job title" value={draft.jobTitle} onChange={(e) => setDraft({ ...draft, jobTitle: e.target.value })} />
-              <input className="w-full rounded-lg border border-border bg-transparent p-2" placeholder="Company" value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} />
-              <input className="w-full rounded-lg border border-border bg-transparent p-2" placeholder="Heading" value={draft.heading} onChange={(e) => setDraft({ ...draft, heading: e.target.value })} />
-              <textarea className="w-full rounded-lg border border-border bg-transparent p-2" placeholder="Subheading" value={draft.subheading} onChange={(e) => setDraft({ ...draft, subheading: e.target.value })} />
-              <textarea className="w-full rounded-lg border border-border bg-transparent p-2" placeholder="Bullets, one per line" value={draft.bullets.join('\n')} onChange={(e) => setDraft({ ...draft, bullets: e.target.value.split('\n').filter(Boolean) })} />
-              <input className="w-full rounded-lg border border-border bg-transparent p-2 text-sm" placeholder="Image URL (optional)" value={draft.imageUrl ?? ''} onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value || null })} />
-              <input className="w-full rounded-lg border border-border bg-transparent p-2 text-sm" placeholder="Company logo URL (optional)" value={draft.companyLogoUrl ?? ''} onChange={(e) => setDraft({ ...draft, companyLogoUrl: e.target.value || null })} />
-              <div className="flex gap-2">
-                <button className="rounded-lg bg-accent px-4 py-2 text-sm text-white" onClick={() => void saveSlide()} disabled={busy}>Save slide</button>
-                {editingId !== null && <button className="rounded-lg border border-border px-4 py-2 text-sm" onClick={resetEditor}>Cancel</button>}
+              <div className="settings-section">
+                <h3 className="settings-section-title">Playback</h3>
+                <label>Autoplay interval (ms)<input type="number" min="1000" value={settings.autoplayIntervalMs} onChange={(e) => setSettings({ ...settings, autoplayIntervalMs: Number(e.target.value) })} /></label>
+              </div>
+
+              <div className="settings-section">
+                <h3 className="settings-section-title">Title</h3>
+                <label>Screen title<textarea rows={2} value={settings.titleText} onChange={(e) => setSettings({ ...settings, titleText: e.target.value })} /></label>
+                <div className="inspector-grid">
+                  <label>Title size<input type="number" value={settings.titleSizePx} onChange={(e) => setSettings({ ...settings, titleSizePx: Number(e.target.value) })} /></label>
+                  <label>Title color<input type="color" value={settings.titleColor} onChange={(e) => setSettings({ ...settings, titleColor: e.target.value })} /></label>
+                </div>
+                <label className="toggle-row">Bold title<input type="checkbox" checked={settings.titleBold} onChange={(e) => setSettings({ ...settings, titleBold: e.target.checked })} /></label>
+              </div>
+
+              <div className="settings-section">
+                <h3 className="settings-section-title">Branding</h3>
+                <label><span className="range-label"><span>Corner logo size</span><span>{Math.round(settings.logoScale * 100)}%</span></span><input type="range" min="0.5" max="2" step="0.1" value={settings.logoScale} onChange={(e) => setSettings({ ...settings, logoScale: Number(e.target.value) })} /></label>
+                <button className="primary-button full-button" onClick={() => void saveGlobal()} disabled={busy}>Save global settings</button>
+              </div>
+
+              <div className="settings-section">
+                <h3 className="settings-section-title">Logos</h3>
+                <UploadField label="Left logo" url={logos.left} onFile={(file) => void upload('left', file)} />
+                <UploadField label="Right logo" url={logos.right} onFile={(file) => void upload('right', file)} />
+                <p className="settings-hint">Logos save automatically.</p>
+              </div>
+
+              <div className="settings-section">
+                <h3 className="settings-section-title">Background</h3>
+                <UploadField label="Background image" url={backgroundUrl} onFile={uploadBg} />
+                <p className="settings-hint">Background saves automatically.</p>
               </div>
             </div>
-          </section>
-        </section>
-
-        <section className="grid gap-6 md:grid-cols-3">
-          <div className="rounded-2xl border border-border p-5">
-            <h2 className="mb-3 font-semibold text-text-h">Autoplay</h2>
-            <div className="flex gap-2">
-              <input className="w-full rounded-lg border border-border bg-transparent p-2" type="number" min="1000" value={settings.autoplayIntervalMs} onChange={(e) => setSettings({ ...settings, autoplayIntervalMs: Number(e.target.value) })} />
-              <button className="rounded-lg bg-accent px-3 text-sm text-white" onClick={() => void saveSettings()} disabled={busy}>Save</button>
-            </div>
-            <p className="mt-2 text-xs">Milliseconds between slides.</p>
-            <label className="mt-4 block text-sm">
-              <span className="mb-1 flex justify-between">
-                <span>Corner logo size</span>
-                <span>{Math.round(settings.logoScale * 100)}%</span>
-              </span>
-              <input
-                className="w-full accent-accent"
-                type="range"
-                min="0.5"
-                max="2"
-                step="0.05"
-                value={settings.logoScale}
-                onChange={(e) => setSettings({ ...settings, logoScale: Number(e.target.value) })}
-              />
-              <span className="mt-1 flex justify-between text-xs text-text">
-                <span>Small</span>
-                <span>Large</span>
-              </span>
-            </label>
-            <div className="mt-5 border-t border-border pt-5">
-              <h2 className="mb-3 font-semibold text-text-h">Top title</h2>
-              <div className="space-y-3">
-                <label className="block text-sm">
-                  <span className="mb-1 block">Title text</span>
-                  <textarea
-                    className="w-full rounded-lg border border-border bg-transparent p-2"
-                    rows={2}
-                    value={settings.titleText}
-                    onChange={(e) => setSettings({ ...settings, titleText: e.target.value })}
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-sm">
-                  <span>Title color</span>
-                  <input
-                    className="h-9 w-16 cursor-pointer rounded border border-border bg-transparent p-1"
-                    type="color"
-                    value={settings.titleColor}
-                    onChange={(e) => setSettings({ ...settings, titleColor: e.target.value })}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="mb-1 flex justify-between">
-                    <span>Title size</span>
-                    <span>{settings.titleSizePx}px</span>
-                  </span>
-                  <input
-                    className="w-full rounded-lg border border-border bg-transparent p-2"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={settings.titleSizePx}
-                    onChange={(e) => setSettings({ ...settings, titleSizePx: Number(e.target.value) })}
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-3 text-sm">
-                  <span>Bold title</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.titleBold}
-                    onChange={(e) => setSettings({ ...settings, titleBold: e.target.checked })}
-                    className="h-4 w-4 accent-accent"
-                  />
-                </label>
-                <button
-                  className="rounded-lg bg-accent px-3 py-2 text-sm text-white"
-                  onClick={() => void saveSettings()}
-                  disabled={busy}
-                >
-                  Save title
-                </button>
-              </div>
-            </div>
+          </div>}
+        </aside>
+        <section className="canvas-stage" onClick={() => { setTab('global'); setDrawerOpen(true) }}>
+          <div className="canvas-toolbar"><span className="canvas-label">Live canvas <b>•</b></span><span>16:9 · {activeIndex + 1} / {Math.max(1, slides.length)}</span></div>
+          <div className="canvas-wrap" onClick={(event) => event.stopPropagation()}>
+            {slides.length ? <PresentationFrame slides={slides} index={activeIndex} logos={logos} settings={settings} backgroundUrl={backgroundUrl} embedded onCanvasClick={() => { setTab('global'); setDrawerOpen(true) }} /> : <div className="empty-canvas"><Sparkles size={28} /><p>Create your first slide</p><button className="primary-button" onClick={() => void newSlide()}>Add slide</button></div>}
           </div>
-          <div className="rounded-2xl border border-border p-5">
-            <h2 className="mb-3 font-semibold text-text-h">Logos</h2>
-            <div className="space-y-3 text-sm">
-              {(['left', 'right'] as const).map((slot) => (
-                <label key={slot} className="flex items-center justify-between gap-3">
-                  <span className="capitalize">{slot} logo</span>
-                  <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && void handleLogo(e.target.files[0], slot)} />
-                </label>
-              ))}
-              <div className="flex gap-2">{logos.left && <img src={logos.left} alt="Left logo" className="h-10 w-20 object-contain" />}{logos.right && <img src={logos.right} alt="Right logo" className="h-10 w-20 object-contain" />}</div>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-border p-5">
-            <h2 className="mb-3 font-semibold text-text-h">Background</h2>
-            <input type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && void handleBackground(e.target.files[0])} />
-            {backgroundUrl && <img src={backgroundUrl} alt="Current background" className="mt-3 h-20 w-full rounded-lg object-cover" />}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-border p-5">
-          <h2 className="mb-3 text-xl font-semibold text-text-h">Import DOCX</h2>
-          <div className="flex flex-wrap items-center gap-3">
-            <input type="file" accept=".docx" onChange={(e) => setDocxFile(e.target.files?.[0] ?? null)} />
-            <button className="rounded-lg border border-border px-4 py-2 text-sm" onClick={() => void prepareImport()} disabled={!docxFile || busy}>Prepare preview</button>
-          </div>
-          {importPreview && (
-            <div className="mt-4 space-y-3">
-              <p className="text-sm">This will add {importPreview.length} slides:</p>
-              {importPreview.map((slide, index) => <p key={`${slide.heading}-${index}`} className="rounded-lg bg-accent-bg p-2 text-sm"><strong>{index + 1}. {slide.heading}</strong> — {slide.bullets.length} bullet(s)</p>)}
-              <button className="rounded-lg bg-accent px-4 py-2 text-sm text-white" onClick={() => void applyImport()} disabled={busy}>Apply import</button>
-            </div>
-          )}
+          <div className="playback"><button onClick={() => setActiveIndex((i) => (i - 1 + slides.length) % slides.length)} disabled={!slides.length} aria-label="Previous slide"><SkipBack size={14} /></button><button className="play-button" onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause preview' : 'Play preview'}>{playing ? <Pause size={14} /> : <Play size={14} />}</button><button onClick={() => setActiveIndex((i) => (i + 1) % slides.length)} disabled={!slides.length} aria-label="Next slide"><SkipForward size={14} /></button><span className="timeline"><i style={{ width: `${slides.length ? ((activeIndex + 1) / slides.length) * 100 : 0}%` }} /></span><span className="timecode">{String(activeIndex + 1).padStart(2, '0')} / {String(Math.max(1, slides.length)).padStart(2, '0')}</span></div>
         </section>
       </div>
     </main>
   )
 }
-
 export default AdminDashboard
