@@ -2,6 +2,26 @@ import * as mammoth from 'mammoth'
 import { uploadAsset } from './cloudinary'
 import type { SlideInput } from './supabase'
 
+type Draft = { degreeYear: string; name: string; jobTitle: string; company: string; imageUrl: string | null }
+type Field = 'degreeYear' | 'name' | 'jobTitle' | 'company'
+
+const LABEL_LINE = /^\s*(degree(?:\s*(?:&|and)?\s*year)?|name|position|company)\s*[-–—:]\s*(.*)$/i
+
+function matchLabel(text: string): { field: Field; value: string } | null {
+  const m = text.match(LABEL_LINE)
+  if (!m) return null
+  const label = m[1].toLowerCase()
+  const value = m[2].trim()
+  if (label.startsWith('degree')) return { field: 'degreeYear', value }
+  if (label.startsWith('name')) return { field: 'name', value }
+  if (label.startsWith('position')) return { field: 'jobTitle', value }
+  return { field: 'company', value }
+}
+
+function blankDraft(): Draft {
+  return { degreeYear: '', name: '', jobTitle: '', company: '', imageUrl: null }
+}
+
 export async function importDocx(file: File): Promise<SlideInput[]> {
   const arrayBuffer = await file.arrayBuffer()
   const result = await mammoth.convertToHtml({
@@ -18,51 +38,47 @@ export async function importDocx(file: File): Promise<SlideInput[]> {
   })
 
   const document = new DOMParser().parseFromString(result.value, 'text/html')
-  const records: Array<{ text: string; imageUrl: string | null }> = []
+  const sections: SlideInput[] = []
+  let draft: Draft | null = null
   let pendingImageUrl: string | null = null
 
+  const flush = () => {
+    if (draft?.name) {
+      sections.push({
+        type: 'content', eyebrow: '', heading: '', subheading: '', bullets: [],
+        imageUrl: draft.imageUrl, degreeYear: draft.degreeYear, name: draft.name,
+        jobTitle: draft.jobTitle, company: draft.company, companyLogoUrl: null,
+      })
+    }
+    draft = null
+  }
+
+  // Every field lives on its own labeled line ("degree- ...", "name- ...",
+  // "position- ...", "company- ..."), in any order. Photos have no label --
+  // an image-only line folds into whichever person is currently being read.
+  // Seeing a label the current draft already has means a new person started.
   for (const element of Array.from(document.body.children)) {
     const image = element.querySelector('img') ?? (element.tagName === 'IMG' ? element : null)
     const imageUrl = image instanceof HTMLImageElement && image.src ? image.src : null
     const text = element.textContent?.trim() ?? ''
 
     if (text) {
-      records.push({ text, imageUrl: imageUrl ?? pendingImageUrl })
-      pendingImageUrl = null
+      const match = matchLabel(text)
+      if (!match) continue
+      if (!draft) draft = blankDraft()
+      else if (draft[match.field]) { flush(); draft = blankDraft() }
+      draft[match.field] = match.value
+      if (imageUrl) draft.imageUrl ??= imageUrl
+      else if (pendingImageUrl) { draft.imageUrl ??= pendingImageUrl; pendingImageUrl = null }
     } else if (imageUrl) {
-      const previous = records[records.length - 1]
-      if (previous && !previous.imageUrl) previous.imageUrl = imageUrl
+      if (draft && !draft.imageUrl) draft.imageUrl = imageUrl
       else pendingImageUrl = imageUrl
     }
   }
-
-  // Each person is five consecutive lines: degree & year, photo (its own
-  // line, folded into the preceding record above), name, position, company.
-  const sections: SlideInput[] = []
-  for (let index = 0; index < records.length; index += 4) {
-    const degreeYear = records[index]
-    const name = records[index + 1]
-    const position = records[index + 2]
-    const company = records[index + 3]
-    if (!name) continue
-
-    sections.push({
-      type: 'content',
-      eyebrow: '',
-      heading: '',
-      subheading: '',
-      bullets: [],
-      imageUrl: degreeYear?.imageUrl ?? name.imageUrl ?? null,
-      degreeYear: degreeYear?.text ?? '',
-      name: name.text,
-      jobTitle: position?.text ?? '',
-      company: company?.text ?? '',
-      companyLogoUrl: null,
-    })
-  }
+  flush()
 
   if (sections.length === 0) {
-    throw new Error('The DOCX file did not contain any recognizable rows (expected: degree & year, image, name, position, company per person).')
+    throw new Error('The DOCX file did not contain any recognizable rows (expected lines like "degree- ...", "name- ...", "position- ...", "company- ...").')
   }
   return sections
 }
