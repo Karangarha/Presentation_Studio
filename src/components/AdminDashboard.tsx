@@ -47,6 +47,7 @@ function AdminDashboard({ presentationId }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [importPreview, setImportPreview] = useState<SlideInput[] | null>(null)
   const [importing, setImporting] = useState(false)
+  const [parsingDocxName, setParsingDocxName] = useState<string | null>(null)
   const titleTimer = useRef<number | null>(null)
   const slideTimer = useRef<number | null>(null)
   const loadId = useRef(0)
@@ -193,8 +194,8 @@ function AdminDashboard({ presentationId }: Props) {
   }
   async function prepareImport(file?: File) {
     if (!file) return
-    setBusy(true); setError(null)
-    try { const { importDocx } = await import('../lib/docx'); setImportPreview(await importDocx(file)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+    setParsingDocxName(file.name); setError(null)
+    try { const { importDocx } = await import('../lib/docx'); setImportPreview(await importDocx(file)) } catch (e) { setError((e as Error).message) } finally { setParsingDocxName(null) }
   }
   async function applyImport() {
     if (!importPreview) return
@@ -241,12 +242,17 @@ function AdminDashboard({ presentationId }: Props) {
           <div className="panel-heading">
             <div><span className="eyebrow">Storyboard</span><h2>{slides.length} slides</h2></div>
             <div className="panel-heading-actions">
-              <button className="icon-button" onClick={() => docxInputRef.current?.click()} title="Import DOCX" aria-label="Import DOCX" disabled={busy}><Upload size={16} /></button>
+              <button className="icon-button" onClick={() => docxInputRef.current?.click()} title="Import DOCX" aria-label="Import DOCX" disabled={parsingDocxName !== null}><Upload size={16} /></button>
               <button className="icon-button" onClick={() => void newSlide()} title="New slide" aria-label="New slide"><Plus size={18} /></button>
             </div>
             <input ref={docxInputRef} type="file" accept=".docx" className="hidden" onChange={(e) => { void prepareImport(e.target.files?.[0]); e.target.value = '' }} />
           </div>
           <div className="slide-list">
+            {parsingDocxName && (
+              <div className="drawer-slide-editor inline">
+                <div className="import-processing-row"><span className="spinner" aria-hidden="true" /> Processing {parsingDocxName}…</div>
+              </div>
+            )}
             {importPreview && (
               <div className="drawer-slide-editor inline">
                 <div className="inspector-heading"><div><span className="eyebrow">Import preview</span><h2>{importPreview.length} slide{importPreview.length === 1 ? '' : 's'}</h2></div></div>

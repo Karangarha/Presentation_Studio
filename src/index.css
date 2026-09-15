@@ -199,6 +199,9 @@ body {
   .import-preview-list li { padding: 6px 8px; border-radius: 6px; background: #1a1c25; }
   .import-preview-actions { display: flex; gap: 8px; }
   .import-preview-actions .primary-button { flex: 1; }
+  .import-processing-row { display: flex; align-items: center; gap: 10px; padding: 16px 18px; color: #a7a9b5; font-size: 12px; }
+  .spinner { width: 15px; height: 15px; flex: 0 0 auto; border: 2px solid #303340; border-top-color: #8374ff; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .panel-heading h2, .inspector-heading h2 { margin: 5px 0 0; color: #f3f3f7; font-size: 15px; }
   .icon-button { padding: 6px; color: #a89eff; }
   .slide-list { padding: 4px 12px; }

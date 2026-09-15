@@ -2,23 +2,6 @@ import * as mammoth from 'mammoth'
 import { uploadAsset } from './cloudinary'
 import type { SlideInput } from './supabase'
 
-function splitPerson(text: string) {
-  const parts = text.split(/\s+[–-]\s+/)
-  return { name: parts[0]?.trim() ?? text, degreeYear: parts.slice(1).join(' – ').trim() }
-}
-
-function splitRole(text: string) {
-  const dashParts = text.split(/\s+[–-]\s+/)
-  if (dashParts.length > 1) {
-    return { jobTitle: dashParts[0].trim(), company: dashParts.slice(1).join(' – ').trim() }
-  }
-  const atIndex = text.toLowerCase().indexOf(' at ')
-  if (atIndex > 0) {
-    return { jobTitle: text.slice(0, atIndex).trim(), company: text.slice(atIndex + 4).trim() }
-  }
-  return { jobTitle: text.trim(), company: '' }
-}
-
 export async function importDocx(file: File): Promise<SlideInput[]> {
   const arrayBuffer = await file.arrayBuffer()
   const result = await mammoth.convertToHtml({
@@ -53,31 +36,33 @@ export async function importDocx(file: File): Promise<SlideInput[]> {
     }
   }
 
+  // Each person is five consecutive lines: degree & year, photo (its own
+  // line, folded into the preceding record above), name, position, company.
   const sections: SlideInput[] = []
-  for (let index = 0; index < records.length; index += 2) {
-    const person = records[index]
-    const role = records[index + 1]
-    if (!person) continue
-    const personData = splitPerson(person.text)
-    const roleData = splitRole(role?.text ?? person.text)
+  for (let index = 0; index < records.length; index += 4) {
+    const degreeYear = records[index]
+    const name = records[index + 1]
+    const position = records[index + 2]
+    const company = records[index + 3]
+    if (!name) continue
 
     sections.push({
       type: 'content',
-      eyebrow: personData.degreeYear,
-      heading: roleData.jobTitle,
+      eyebrow: '',
+      heading: '',
       subheading: '',
       bullets: [],
-      imageUrl: person.imageUrl ?? role?.imageUrl ?? null,
-      degreeYear: personData.degreeYear,
-      name: personData.name,
-      jobTitle: roleData.jobTitle,
-      company: roleData.company,
+      imageUrl: degreeYear?.imageUrl ?? name.imageUrl ?? null,
+      degreeYear: degreeYear?.text ?? '',
+      name: name.text,
+      jobTitle: position?.text ?? '',
+      company: company?.text ?? '',
       companyLogoUrl: null,
     })
   }
 
   if (sections.length === 0) {
-    throw new Error('The DOCX file did not contain importable person and role rows.')
+    throw new Error('The DOCX file did not contain any recognizable rows (expected: degree & year, image, name, position, company per person).')
   }
   return sections
 }
