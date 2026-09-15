@@ -100,7 +100,7 @@ function SlideCarousel({ slides, index, compact = false, fixed = false, focusOnl
               } flex-col items-center justify-center gap-4 overflow-hidden rounded-[22px] border border-white/15 text-center text-text-h backdrop-blur-lg ${cardTone}`}
             >
               <p style={fixed ? { fontSize: fixedTextSize } : undefined} className={`w-full shrink-0 truncate font-medium uppercase tracking-wide text-text ${focusOnly && !isActive ? 'invisible' : ''} ${
-                isActive ? fixed ? 'text-[clamp(0.55rem,1.2cqw,0.9rem)]' : compact ? 'text-base' : 'text-[clamp(1.125rem,1.5vw,1.375rem)]' : absOffset === 1 ? fixed ? 'text-[clamp(0.4rem,0.85cqw,0.65rem)]' : 'text-[clamp(0.8rem,1.1vw,1rem)]' : fixed ? 'text-[clamp(0.35rem,0.7cqw,0.5rem)]' : 'text-[clamp(0.65rem,0.9vw,0.85rem)]'
+                isActive ? fixed ? 'text-[clamp(0.55rem,1.2cqw,0.9rem)]' : compact ? 'text-base' : 'text-[clamp(1rem,1.3vw,1.25rem)]' : absOffset === 1 ? fixed ? 'text-[clamp(0.4rem,0.85cqw,0.65rem)]' : 'text-[clamp(0.8rem,1.1vw,1rem)]' : fixed ? 'text-[clamp(0.35rem,0.7cqw,0.5rem)]' : 'text-[clamp(0.65rem,0.9vw,0.85rem)]'
               }`}>
                 {slide.degreeYear || slide.eyebrow || 'Degree & year'}
               </p>
@@ -120,21 +120,21 @@ function SlideCarousel({ slides, index, compact = false, fixed = false, focusOnl
               <div className="flex min-h-0 w-full shrink-0 flex-col items-center gap-2">
                 <h2 style={fixed ? { fontSize: fixedTextSize } : undefined}
                   className={`line-clamp-2 max-w-full font-medium text-text-h ${focusOnly && !isActive ? 'invisible' : ''} ${
-                    isActive ? fixed ? 'text-[clamp(0.6rem,1.4cqw,1rem)] leading-tight' : compact ? 'text-xl leading-tight' : 'text-[clamp(2.5rem,4vw,3.75rem)] leading-tight' : absOffset === 1 ? fixed ? 'text-[clamp(0.4rem,0.9cqw,0.7rem)] leading-tight' : 'text-[clamp(0.85rem,1.25vw,1.1rem)] leading-tight' : fixed ? 'text-[clamp(0.35rem,0.7cqw,0.55rem)] leading-tight' : 'text-[clamp(0.7rem,1vw,0.9rem)] leading-tight'
+                    isActive ? fixed ? 'text-[clamp(0.6rem,1.4cqw,1rem)] leading-tight' : compact ? 'text-xl leading-tight' : 'text-[clamp(1.75rem,2.75vw,2.5rem)] leading-tight' : absOffset === 1 ? fixed ? 'text-[clamp(0.4rem,0.9cqw,0.7rem)] leading-tight' : 'text-[clamp(0.85rem,1.25vw,1.1rem)] leading-tight' : fixed ? 'text-[clamp(0.35rem,0.7cqw,0.55rem)] leading-tight' : 'text-[clamp(0.7rem,1vw,0.9rem)] leading-tight'
                   }`}
                 >
                   {slide.name || slide.heading}
                 </h2>
                 {(slide.jobTitle || slide.subheading) && (
                   <p style={fixed ? { fontSize: `calc(${fixedTextSize} * 0.65)` } : undefined} className={`w-full truncate text-text ${focusOnly && !isActive ? 'invisible' : ''} ${
-                    isActive ? fixed ? 'text-[clamp(0.4rem,0.9cqw,0.65rem)]' : compact ? 'text-sm' : 'text-[clamp(1.375rem,1.8vw,1.625rem)]' : absOffset === 1 ? fixed ? 'text-[clamp(0.35rem,0.65cqw,0.5rem)]' : 'text-[clamp(0.75rem,1vw,0.95rem)]' : fixed ? 'text-[clamp(0.3rem,0.55cqw,0.45rem)]' : 'text-[clamp(0.6rem,0.85vw,0.8rem)]'
+                    isActive ? fixed ? 'text-[clamp(0.4rem,0.9cqw,0.65rem)]' : compact ? 'text-sm' : 'text-[clamp(1.125rem,1.45vw,1.3125rem)]' : absOffset === 1 ? fixed ? 'text-[clamp(0.35rem,0.65cqw,0.5rem)]' : 'text-[clamp(0.75rem,1vw,0.95rem)]' : fixed ? 'text-[clamp(0.3rem,0.55cqw,0.45rem)]' : 'text-[clamp(0.6rem,0.85vw,0.8rem)]'
                   }`}>
                     {slide.jobTitle || slide.subheading}
                   </p>
                 )}
                 {(slide.company || slide.heading) && (
                   <p style={fixed ? { fontSize: `calc(${fixedTextSize} * 0.65)` } : undefined} className={`w-full truncate text-text ${focusOnly && !isActive ? 'invisible' : ''} ${
-                    isActive ? fixed ? 'text-[clamp(0.4rem,0.9cqw,0.65rem)]' : compact ? 'text-sm' : 'text-[clamp(1.125rem,1.5vw,1.375rem)]' : absOffset === 1 ? fixed ? 'text-[clamp(0.35rem,0.65cqw,0.5rem)]' : 'text-[clamp(0.75rem,1vw,0.95rem)]' : fixed ? 'text-[clamp(0.3rem,0.55cqw,0.45rem)]' : 'text-[clamp(0.6rem,0.85vw,0.8rem)]'
+                    isActive ? fixed ? 'text-[clamp(0.4rem,0.9cqw,0.65rem)]' : compact ? 'text-sm' : 'text-[clamp(0.9375rem,1.2vw,1.125rem)]' : absOffset === 1 ? fixed ? 'text-[clamp(0.35rem,0.65cqw,0.5rem)]' : 'text-[clamp(0.75rem,1vw,0.95rem)]' : fixed ? 'text-[clamp(0.3rem,0.55cqw,0.45rem)]' : 'text-[clamp(0.6rem,0.85vw,0.8rem)]'
                   }`}>
                     {slide.company || (slide.name ? slide.heading : '')}
                   </p>
