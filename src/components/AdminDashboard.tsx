@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Pause, Pencil, Play, Plus, Sparkles, SkipBack, SkipForward, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Pause, Pencil, Play, Plus, Sparkles, SkipBack, SkipForward, Trash2, Upload, X } from 'lucide-react'
 import { uploadAsset, uploadLogo } from '../lib/cloudinary'
 import PresentationFrame from './PresentationFrame'
 import {
@@ -45,11 +45,14 @@ function AdminDashboard({ presentationId }: Props) {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('All changes saved')
   const [error, setError] = useState<string | null>(null)
+  const [importPreview, setImportPreview] = useState<SlideInput[] | null>(null)
+  const [importing, setImporting] = useState(false)
   const titleTimer = useRef<number | null>(null)
   const slideTimer = useRef<number | null>(null)
   const loadId = useRef(0)
   const drawerRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const docxInputRef = useRef<HTMLInputElement | null>(null)
 
   const load = useCallback(async () => {
     const id = ++loadId.current
@@ -188,6 +191,25 @@ function AdminDashboard({ presentationId }: Props) {
   async function uploadSlidePhoto(file?: File) {
     if (!file) return; setBusy(true); try { const url = await uploadAsset(file, `slide-photo-${crypto.randomUUID()}`); editDraft({ imageUrl: url }) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
+  async function prepareImport(file?: File) {
+    if (!file) return
+    setBusy(true); setError(null)
+    try { const { importDocx } = await import('../lib/docx'); setImportPreview(await importDocx(file)) } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
+  }
+  async function applyImport() {
+    if (!importPreview) return
+    setImporting(true); setError(null)
+    try {
+      let position = slides.length
+      for (const section of importPreview) {
+        position += 1
+        await createSlide({ ...section, position }, presentationId)
+      }
+      setImportPreview(null)
+      await load()
+      setStatus('All changes saved')
+    } catch (e) { setError((e as Error).message) } finally { setImporting(false) }
+  }
 
   const editorFields = (
     <>
@@ -216,8 +238,31 @@ function AdminDashboard({ presentationId }: Props) {
           <div className="drawer-resize-handle" onPointerDown={(event) => { event.preventDefault(); setResizingDrawer(true) }} role="separator" aria-label="Resize settings drawer" aria-orientation="vertical" />
           <div className="drawer-tabs"><button className={tab === 'slide' ? 'active' : ''} onClick={() => setTab('slide')}>Slides</button><button className={tab === 'global' ? 'active' : ''} onClick={() => setTab('global')}>Global</button></div>
           {tab === 'slide' && <div className="slide-sidebar">
-          <div className="panel-heading"><div><span className="eyebrow">Storyboard</span><h2>{slides.length} slides</h2></div><button className="icon-button" onClick={() => void newSlide()} title="New slide" aria-label="New slide"><Plus size={18} /></button></div>
+          <div className="panel-heading">
+            <div><span className="eyebrow">Storyboard</span><h2>{slides.length} slides</h2></div>
+            <div className="panel-heading-actions">
+              <button className="icon-button" onClick={() => docxInputRef.current?.click()} title="Import DOCX" aria-label="Import DOCX" disabled={busy}><Upload size={16} /></button>
+              <button className="icon-button" onClick={() => void newSlide()} title="New slide" aria-label="New slide"><Plus size={18} /></button>
+            </div>
+            <input ref={docxInputRef} type="file" accept=".docx" className="hidden" onChange={(e) => { void prepareImport(e.target.files?.[0]); e.target.value = '' }} />
+          </div>
           <div className="slide-list">
+            {importPreview && (
+              <div className="drawer-slide-editor inline">
+                <div className="inspector-heading"><div><span className="eyebrow">Import preview</span><h2>{importPreview.length} slide{importPreview.length === 1 ? '' : 's'}</h2></div></div>
+                <div className="inspector-content">
+                  <ul className="import-preview-list">
+                    {importPreview.map((section, index) => (
+                      <li key={index}>{section.name || 'Unnamed'}{section.jobTitle ? ` — ${section.jobTitle}` : ''}{section.company ? ` @ ${section.company}` : ''}</li>
+                    ))}
+                  </ul>
+                  <div className="import-preview-actions">
+                    <button className="primary-button" onClick={() => void applyImport()} disabled={importing}>{importing ? 'Importing…' : `Import ${importPreview.length} slide${importPreview.length === 1 ? '' : 's'}`}</button>
+                    <button className="ghost-button" onClick={() => setImportPreview(null)} disabled={importing}>Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
             {slides.map((slide, index) => (
               <div key={slide.id} className="slide-row">
                 <div draggable={!busy} onDragStart={() => setDragging(index)} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragging !== null) void moveSlides(dragging, index); setDragging(null) }} onClick={() => previewSlide(slide, index)} className={`slide-item ${index === activeIndex ? 'selected' : ''} ${dragging === index ? 'dragging' : ''}`}>
